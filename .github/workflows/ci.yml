@@ -8,7 +8,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/iris-prediction-api
+  # Convertir automatiquement en minuscules
+  IMAGE_NAME: ${{ github.repository_owner | lower }}/${{ github.event.repository.name | lower }}/iris-prediction-api
 
 jobs:
   # ─────────────────────────────────────────
