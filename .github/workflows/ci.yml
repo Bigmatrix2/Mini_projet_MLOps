@@ -8,35 +8,35 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  # Convertir automatiquement en minuscules
-  IMAGE_NAME: ${{ github.repository_owner | lower }}/${{ github.event.repository.name | lower }}/iris-prediction-api
+  # Nom en minuscules hardcodé pour Docker
+  IMAGE_NAME: bigmatrix2/mini_projet_mlops/iris-prediction-api
 
 jobs:
   # ─────────────────────────────────────────
   # JOB 1 : Entraînement (feature/* et develop)
   # ─────────────────────────────────────────
   train:
-    name: Train Model
+    name: Installer & Entraîner le modèle
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout du code
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Installer les dépendances
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Train model
+      - name: Entraîner le modèle
         run: python train.py
 
-      - name: Upload model artifact
+      - name: Uploader le modèle
         uses: actions/upload-artifact@v4
         with:
           name: model-artifact
@@ -44,10 +44,10 @@ jobs:
           retention-days: 1
 
   # ─────────────────────────────────────────
-  # JOB 2 : Build (develop only)
+  # JOB 2 : Build Docker (develop seulement)
   # ─────────────────────────────────────────
   build:
-    name: Build Docker Image
+    name: Build image Docker
     runs-on: ubuntu-latest
     needs: train
     if: github.ref == 'refs/heads/develop'
@@ -56,15 +56,11 @@ jobs:
       contents: read
       packages: write
 
-    outputs:
-      tags: ${{ steps.meta.outputs.tags }}
-      labels: ${{ steps.meta.outputs.labels }}
-
     steps:
-      - name: Checkout code
+      - name: Checkout du code
         uses: actions/checkout@v4
 
-      - name: Download model artifact
+      - name: Télécharger le modèle
         uses: actions/download-artifact@v4
         with:
           name: model-artifact
@@ -72,7 +68,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GitHub Container Registry
+      - name: Login sur GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -88,7 +84,7 @@ jobs:
             type=sha,prefix=sha-
             type=raw,value=latest
 
-      - name: Build Docker image
+      - name: Build de l'image Docker
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -97,7 +93,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=docker,dest=/tmp/image.tar
 
-      - name: Upload image artifact
+      - name: Uploader l'image Docker
         uses: actions/upload-artifact@v4
         with:
           name: docker-image
@@ -105,10 +101,10 @@ jobs:
           retention-days: 1
 
   # ─────────────────────────────────────────
-  # JOB 3 : Push (develop only)
+  # JOB 3 : Push Docker (develop seulement)
   # ─────────────────────────────────────────
   push:
-    name: Push Docker Image
+    name: Push image Docker
     runs-on: ubuntu-latest
     needs: build
     if: github.ref == 'refs/heads/develop'
@@ -118,20 +114,20 @@ jobs:
       packages: write
 
     steps:
-      - name: Log in to GitHub Container Registry
+      - name: Login sur GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Download image artifact
+      - name: Télécharger l'image Docker
         uses: actions/download-artifact@v4
         with:
           name: docker-image
           path: /tmp
 
-      - name: Load and push Docker image
+      - name: Charger et push l'image Docker
         run: |
           docker load --input /tmp/image.tar
           docker push --all-tags ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
